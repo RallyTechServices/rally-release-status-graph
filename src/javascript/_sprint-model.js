@@ -62,6 +62,8 @@ Ext.define('Sprint',{
         {name:'end_date',type:'date',defaultValue:null,convert:convertEndDate},
         {name:'start_date',type:'date',defaultValue:null,convert:convertStartDate},
         {name:'iteration',type:'auto'},
+        {name:'total_accepted_defect_estimate',defaultValue:0, convert:convertEstimate},
+        {name:'total_accepted_story_estimate',defaultValue:0,  convert:convertEstimate},
         {name:'total_defect_estimate',defaultValue:0, convert:convertEstimate},
         {name:'total_story_estimate',defaultValue:0,  convert:convertEstimate},
         {name:'total_estimate',defaultValue:0, convert:convertTotalEstimate}

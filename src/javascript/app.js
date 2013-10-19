@@ -4,10 +4,298 @@ Ext.define('CustomApp', {
 
     logger: new Rally.technicalservices.logger(),
     items: [
-        {xtype:'container',itemId:'message_box',tpl:'Hello, <tpl>{_refObjectName}</tpl>'},
+        {xtype:'container',itemId:'selector_box',margin: 5, layout:{type:'hbox'}},
+        {xtype:'container',itemId:'chart_box' },
         {xtype:'tsinfolink'}
     ],
     launch: function() {
-        this.down('#message_box').update(this.getContext().getUser());
+        this._addSummary();
+    },
+    _addSummary: function() {
+        var selector_box = this.down('#selector_box');
+        selector_box.add({
+            xtype:'rallyreleasecombobox',
+            itemId:'releasebox',
+            listeners: {
+                scope: this,
+                change: function(rb, new_value, old_value) {
+                    this._getSprints();
+                },
+                ready: function(rb) {
+                    this._getSprints();
+                }
+            }
+        });
+        selector_box.add({
+            xtype:'container',
+            itemId:'summary',
+            tpl: "<table class='summary'><tr>" +
+                "<td class='summary'>Total Planned US Points: <b>{total_story_estimate}</b></td>" +
+                "<td class='summary'>Accepted US Points: <b>{total_accepted_story_estimate}</b></td>" +
+                "<td class='summary'>Total DE Points: <b>{total_defect_estimate}</b></td>" +
+                "<td class='summary'>Accepted DE Points: <b>{total_accepted_defect_estimate}</b></td>" +
+                "</tr></table>",
+            data: { }
+        });
+    },
+    _defineIterationQuery:function() {
+        var release = this.down('#releasebox').getRecord();
+        var start_date_iso = Rally.util.DateTime.toIsoString(release.get('ReleaseStartDate'), true);
+        var end_date_iso = Rally.util.DateTime.toIsoString(release.get('ReleaseDate'), true);
+
+        var start_query = Ext.create('Rally.data.QueryFilter',{ 
+                property: "StartDate", operator:">=", value: start_date_iso
+            }).and( Ext.create('Rally.data.QueryFilter',{
+                property: "StartDate", operator:"<=", value: end_date_iso
+            })
+        );
+        var end_query = Ext.create('Rally.data.QueryFilter',{ 
+                property: "EndDate", operator:">=", value: start_date_iso 
+            }).and( Ext.create('Rally.data.QueryFilter',{
+                property: "EndDate", operator:"<=", value: end_date_iso
+            })
+        );
+        var iteration_query = start_query.or(end_query);
+        
+        this.logger.log(this,"iterations that match",iteration_query.toString());
+        return iteration_query;
+    },
+    _getSprints: function() {
+        var me = this;
+        me.logger.log(this,"_getSprints");
+        this.sprint_hash = {};
+        // anti_sprint holds data for release artifacts not in approved sprints
+        this.anti_sprint = Ext.create('Sprint',{ "Name": "Other" });
+        
+        this._asynch_return_flags = {};
+        
+        // clear display
+        this.down('#chart_box').removeAll();
+        if ( this.down('#summary') ) {
+            this.down('#summary').update({});
+        }
+        
+        Ext.create('Rally.data.WsapiDataStore',{
+            model:'Iteration',
+            autoLoad: true,
+            limit:'Infinity',
+            context: { projectScopeDown: false, projectScopeUp: false },
+            fetch: ['Name','ObjectID','StartDate','EndDate'],
+            filters: me._defineIterationQuery(),
+            sorters: [{ property: 'StartDate' }],
+            listeners: {
+                scope: this,
+                load: function(store,records,success){
+                    if ( records.length  == 0 ) {
+                        this.down('#chart_box').add({
+                            xtype:'container',
+                            html: "There are no iterations in this release's timebox",
+                            padding: 10
+                        });
+                    } else {
+                        Ext.Array.each(records, function(iteration){
+                            var sprint = Ext.create('Sprint',{iteration:iteration});
+                            me.sprint_hash[sprint.get('Name')] = sprint;
+                        });
+                        
+                        me._getReleaseData();
+                    }
+                }
+            }
+        });
+    },
+    _getReleaseData: function() {
+        var me = this;
+        me.logger.log(this,"_getReleaseData");
+        var release = this.down('#releasebox').getRecord();
+        var filters = [
+            {property:'PlanEstimate',operator:'>',value:0},
+            {property:'Release.Name',value:release.get('Name')}
+        ];
+        
+        var fetch = ['PlanEstimate','ScheduleState','Iteration','Name'];
+        
+        Ext.create('Rally.data.WsapiDataStore',{
+            autoLoad: true,
+            limit:'Infinity',
+            model: 'UserStory',
+            filters: filters,
+            fetch:fetch,
+            listeners: {
+                scope: this,
+                load: function(store,stories){
+                    Ext.Array.each(stories,function(story){
+                        var sprint = me.anti_sprint;
+                        if ( story.get('Iteration') && me.sprint_hash[story.get('Iteration').Name]) {
+                            sprint = me.sprint_hash[story.get('Iteration').Name];
+                        }
+                        sprint.add('total_story_estimate',story.get('PlanEstimate'));
+                    });
+                    Ext.create('Rally.data.WsapiDataStore',{
+                        autoLoad: true,
+                        limit:'Infinity',
+                        model:'Defect',
+                        filters:filters,
+                        fetch:fetch,
+                        listeners:{
+                            scope: this,
+                            load: function(store,defects){
+                                Ext.Array.each(defects,function(defect){
+                                    var sprint = me.anti_sprint;
+                                    if ( defect.get('Iteration') && me.sprint_hash[defect.get('Iteration').Name]) {
+                                        sprint = me.sprint_hash[defect.get('Iteration').Name];
+                                    }
+                                    sprint.add('total_defect_estimate',defect.get('PlanEstimate'));
+                                });
+                                
+                                me._getAcceptedReleaseData();
+                            }
+                        }
+                    })
+                }
+            }
+        });
+    },
+    /*
+     * Easier than finding out at the top whether there's a state
+     * AFTER accepted, have to go get all the points that are from
+     * schedule states > Completed
+     */
+    _getAcceptedReleaseData: function() {
+        var me = this;
+        me.logger.log(this,"_getAcceptedReleaseData");
+        var release = this.down('#releasebox').getRecord();
+        var filters = [
+            {property:'PlanEstimate',operator:'>',value:0},
+            {property:'ScheduleState',operator:'>',value:'Completed'},
+            {property:'Release.Name',value:release.get('Name')}
+        ];
+        var fetch = ['PlanEstimate','ScheduleState','Iteration','Name'];
+        
+        Ext.create('Rally.data.WsapiDataStore',{
+            autoLoad: true,
+            limit:'Infinity',
+            model: 'UserStory',
+            filters: filters,
+            fetch:fetch,
+            listeners: {
+                scope: this,
+                load: function(store,stories){
+                    Ext.Array.each(stories,function(story){
+                        var sprint = me.anti_sprint;
+                        if ( story.get('Iteration') && me.sprint_hash[story.get('Iteration').Name]) {
+                            sprint = me.sprint_hash[story.get('Iteration').Name];
+                        }
+                        
+                        sprint.add('total_accepted_story_estimate',story.get('PlanEstimate'));
+                    });
+                    Ext.create('Rally.data.WsapiDataStore',{
+                        autoLoad: true,
+                        limit:'Infinity',
+                        model:'Defect',
+                        filters:filters,
+                        fetch:fetch,
+                        listeners:{
+                            scope: this,
+                            load: function(store,defects){
+                                Ext.Array.each(defects,function(defect){
+                                    var sprint = me.anti_sprint;
+                                    if ( defect.get('Iteration') && me.sprint_hash[defect.get('Iteration').Name]) {
+                                        sprint = me.sprint_hash[defect.get('Iteration').Name];
+                                    }
+                                    sprint.add('total_accepted_defect_estimate',defect.get('PlanEstimate'));
+                                });
+                                
+                                me._prepareChartData();
+                            }
+                        }
+                    })
+                }
+            }
+        });
+
+    },
+    _allAsynchronousCallsReturned: function() {
+        this.logger.log(this,"Still waiting for:", this._asynch_return_flags);
+        return ( Ext.Object.getKeys(this._asynch_return_flags).length == 0 );
+    },
+    _prepareChartData: function() {
+        var chart_data = {
+            categories: [""],
+            total_by_sprint: [0]
+        };
+        if (this._allAsynchronousCallsReturned()){
+            var me = this;
+            this.logger.log(this,"sprint_hash",me.sprint_hash);
+            var totals = {
+                total_accepted_story_estimate:me.anti_sprint.get('total_accepted_story_estimate'),
+                total_accepted_defect_estimate:me.anti_sprint.get('total_accepted_defect_estimate'),
+                total_story_estimate:me.anti_sprint.get('total_story_estimate'),
+                total_defect_estimate:me.anti_sprint.get('total_defect_estimate'),
+                total_estimate:me.anti_sprint.get('total_estimate')
+            };
+            var accepted_running_total = 0;
+            
+            Ext.Object.each(this.sprint_hash, function(name,sprint){
+                me.logger.log(me,"sprint",name);
+                chart_data.categories.push(sprint.get('Name'));
+                accepted_running_total += sprint.get('total_accepted_story_estimate');
+                accepted_running_total += sprint.get('total_accepted_defect_estimate');
+                chart_data.total_by_sprint.push(accepted_running_total);
+                
+                Ext.Object.each(totals, function(key,value){
+                    totals[key] += sprint.get(key);
+                });
+                
+            });
+            
+            this.down('#summary').update(totals);
+            this._makeChart(chart_data);
+        }
+    },
+    _makeChart: function(chart_data){
+        this.logger.log(this,"_makeChart",chart_data);
+        this.down('#chart_box').removeAll();
+        this.down('#chart_box').add({
+            xtype:'rallychart',
+            chartData: {
+                categories: chart_data.categories,
+                series: [{
+                    type:'line',
+                    data:chart_data.total_by_sprint,
+                    visible: true,
+                    name: 'Total Planned US/DE Pts'
+                }]
+            },
+            height: 600,
+            chartConfig: {
+                chart: {},
+                title: {
+                    text: 'Release Status',
+                    align: 'center'
+                },
+                yAxis: [{
+                    title: {
+                        enabled: true,
+                        text: 'Story Points',
+                        style: { fontWeight: 'normal' }
+                    },
+                    min: 0
+                }],
+                xAxis: [{
+                    title: {
+                        enabled: true,
+                        text: 'Iterations'
+                    },
+                    minorTickInterval: null, 
+                    tickLength: 0,
+                    categories: chart_data.categories,
+                    labels: {
+                        rotation: 90,
+                        align: 'left'
+                    }
+                }]
+            }
+        });
     }
 });

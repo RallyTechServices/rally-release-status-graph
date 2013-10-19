@@ -5,16 +5,21 @@ describe("Sprint Object estimate", function() {
             
             expect(sprint.get('total_defect_estimate')).toEqual(0);
             expect(sprint.get('total_story_estimate')).toEqual(0);
+            expect(sprint.get('total_accepted_defect_estimate')).toEqual(0);
+            expect(sprint.get('total_accepted_story_estimate')).toEqual(0);
             expect(sprint.get('total_estimate')).toBe(0);
         });
         
         it("giving null values should return zeroes",function(){
             var sprint = Ext.create('Sprint',{
                 total_defect_estimate: null,
-                total_story_estimate: null
+                total_story_estimate: null,
+                total_accepted_defect_estimate: null
             });
             expect(sprint.get('total_defect_estimate')).toEqual(0);
             expect(sprint.get('total_story_estimate')).toEqual(0);
+            expect(sprint.get('total_accepted_defect_estimate')).toEqual(0);
+            expect(sprint.get('total_accepted_story_estimate')).toEqual(0);
             expect(sprint.get('total_estimate')).toBe(0);
         });
         
@@ -47,6 +52,17 @@ describe("Sprint Object estimate", function() {
         it("leaving out one of the estimates should not affect addition",function(){
             var sprint = Ext.create('Sprint',{
                 total_story_estimate: 2
+            });
+            
+            expect(sprint.get('total_defect_estimate')).toEqual(0);
+            expect(sprint.get('total_story_estimate')).toEqual(2);
+            expect(sprint.get('total_estimate')).toEqual(2);
+        });
+        
+        it("setting total accepted is independent of calculated total",function(){
+            var sprint = Ext.create('Sprint',{
+                total_story_estimate: 2,
+                total_accepted_story_estimate: 1
             });
             
             expect(sprint.get('total_defect_estimate')).toEqual(0);
