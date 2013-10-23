@@ -31,20 +31,40 @@ Ext.define('Rally.technicalservices.InfoLink',{
         this.callParent(arguments);
         this.mon(this.el,'click',this.onClick,this);
     },
-    
-    _determineSize: function(container) {
-        console.log(container.xtype,container,container.getEl());
-        if ( container.ownerCt ) {
-            this._determineSize(container.ownerCt);
-        } else if ( container.xtype === "viewport" ) {
-            console.log("--");
-            console.log(container.getEl().dom.outerHTML);
+    _generateChecksum: function(string){
+        var chk = 0x12345678,
+            i;
+        string = string.replace(/var CHECKSUM = .*;/,"");
+        
+        for (i = 0; i < string.length; i++) {
+            chk += (string.charCodeAt(i) * i);
         }
-        return null;
+    
+        return chk;
+    },
+    _checkChecksum: function(container) {
+        var me = this;
+        Ext.Ajax.request({
+            url: document.URL,
+            params: {
+                id: 1
+            },
+            success: function (response) {
+                text = response.responseText;
+                if ( CHECKSUM ) {
+                    if ( CHECKSUM !== me._generateChecksum(text) ) {
+                        console.log("Checksums don't match!");
+                        if ( me.dialog ) {
+                            me.dialog.add({xtype:'container',html:'Checksums do not match'});
+                        }
+                    }
+                }
+            }
+        });
     },
     onClick: function(e) {
         var me = this;
-        // var current_size = this._determineSize(this);
+        this._checkChecksum(this);
         
         var dialog_items = [];
         

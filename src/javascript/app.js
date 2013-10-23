@@ -264,7 +264,7 @@ Ext.define('CustomApp', {
                     type:'line',
                     data:chart_data.total_by_sprint,
                     visible: true,
-                    name: 'Total Planned US/DE Pts'
+                    name: 'Accepted US/DE Pts'
                 }]
             },
             height: 600,

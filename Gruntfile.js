@@ -6,7 +6,6 @@ module.exports = function(grunt) {
     
     var config = { auth: {} };
     
-    
     if ( grunt.file.exists(config_file_name) ) {
     
         config = grunt.file.readJSON('config.json');
@@ -80,26 +79,26 @@ module.exports = function(grunt) {
         }
     });
     
-    grunt.registerTask('setChecksum', 'Create .md5 checksum file *', function() {
-        var deploy_file = 'deploy/App.html';
-        
+    grunt.registerTask('setChecksum', 'Make a sloppy checksum', function() {
         var fs = require('fs');
-        var crypto = require('crypto');
-        md5 = crypto.createHash('md5');
+        var chk = 0x12345678,
+            i;
+        var deploy_file = 'deploy/App.html';
+
         var file = grunt.file.read(deploy_file);
-        md5.update(file);
-        var md5Hash = md5.digest('hex');
-        grunt.log.writeln('file md5: ' + md5Hash);
+        string = file.replace(/var CHECKSUM = .*;/,"");
+        
+        for (i = 0; i < string.length; i++) {
+            chk += (string.charCodeAt(i) * i);
+        }
+        grunt.log.writeln('sloppy checksum: ' + chk);
+        grunt.log.writeln('length: ' + string.length);
 // 
         grunt.template.addDelimiters('square-brackets','[%','%]');
         
-        var output = grunt.template.process(file, { data: { checksum: md5Hash },  delimiters: 'square-brackets' });
+        var output = grunt.template.process(file, { data: { checksum: chk },  delimiters: 'square-brackets' });
         grunt.file.write(deploy_file,output);
         
-//        // Create new file with the same name with .md5 extension
-//        var md5FileName = file + '.md5';
-//        grunt.file.write(md5FileName, md5Hash);
-//        grunt.log.write('File "' + md5FileName + '" created.').verbose.write('...').ok();
     });
 
     //load
