@@ -26,6 +26,7 @@ Ext.define('CustomApp', {
                 }
             }
         });
+
         selector_box.add({
             xtype:'container',
             itemId:'summary',
@@ -42,20 +43,29 @@ Ext.define('CustomApp', {
         var release = this.down('#releasebox').getRecord();
         var start_date_iso = Rally.util.DateTime.toIsoString(release.get('ReleaseStartDate'), true);
         var end_date_iso = Rally.util.DateTime.toIsoString(release.get('ReleaseDate'), true);
+//
+        // All sprints that touch the release dates
+//        var start_query = Ext.create('Rally.data.QueryFilter',{ 
+//                property: "StartDate", operator:">=", value: start_date_iso
+//            }).and( Ext.create('Rally.data.QueryFilter',{
+//                property: "StartDate", operator:"<=", value: end_date_iso
+//            })
+//        );
+//        var end_query = Ext.create('Rally.data.QueryFilter',{ 
+//                property: "EndDate", operator:">=", value: start_date_iso 
+//            }).and( Ext.create('Rally.data.QueryFilter',{
+//                property: "EndDate", operator:"<=", value: end_date_iso
+//            })
+//        );
+//        var iteration_query = start_query.or(end_query);
 
-        var start_query = Ext.create('Rally.data.QueryFilter',{ 
-                property: "StartDate", operator:">=", value: start_date_iso
-            }).and( Ext.create('Rally.data.QueryFilter',{
-                property: "StartDate", operator:"<=", value: end_date_iso
-            })
-        );
-        var end_query = Ext.create('Rally.data.QueryFilter',{ 
-                property: "EndDate", operator:">=", value: start_date_iso 
+        // All sprints inside the release dates:
+        var iteration_query = Ext.create('Rally.data.QueryFilter',{ 
+                property: "StartDate", operator:">=", value: start_date_iso 
             }).and( Ext.create('Rally.data.QueryFilter',{
                 property: "EndDate", operator:"<=", value: end_date_iso
             })
-        );
-        var iteration_query = start_query.or(end_query);
+        );        
         
         this.logger.log(this,"iterations that match",iteration_query.toString());
         return iteration_query;
