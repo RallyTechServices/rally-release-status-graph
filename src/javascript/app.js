@@ -222,7 +222,8 @@ Ext.define('CustomApp', {
     _prepareChartData: function() {
         var chart_data = {
             categories: [""],
-            total_by_sprint: [0]
+            total_by_sprint: [0],
+            ideal_by_sprint: []
         };
         if (this._allAsynchronousCallsReturned()){
             var me = this;
@@ -250,6 +251,16 @@ Ext.define('CustomApp', {
             });
             
             this.down('#summary').update(totals);
+            
+            // make a guess line
+            if ( totals.total_estimate > 0 && chart_data.total_by_sprint.length > 1 ) {
+                var ideal_per_sprint = totals.total_estimate / ( chart_data.total_by_sprint.length - 1 );
+                var running_ideal = 0;
+                Ext.Array.each(chart_data.total_by_sprint,function(counter){
+                    chart_data.ideal_by_sprint.push(running_ideal);
+                    running_ideal += ideal_per_sprint;
+                });
+            }
             this._makeChart(chart_data);
         }
     },
@@ -265,6 +276,13 @@ Ext.define('CustomApp', {
                     data:chart_data.total_by_sprint,
                     visible: true,
                     name: 'Accepted US/DE Pts'
+                },
+                {
+                    type:'line',
+                    data:chart_data.ideal_by_sprint,
+                    visible: true,
+                    name: 'Total Planned US/DE Pts'
+                
                 }]
             },
             height: 600,
