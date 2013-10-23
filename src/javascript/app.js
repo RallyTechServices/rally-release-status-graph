@@ -367,9 +367,10 @@ Ext.define('CustomApp', {
                     name: 'Initial Planned US/DE Pts'
                 }]
             },
-            height: 600,
             chartConfig: {
-                chart: {},
+                chart: {
+                    height: 600
+                },
                 title: {
                     text: 'Release Status',
                     align: 'center'
