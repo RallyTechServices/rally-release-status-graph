@@ -19,10 +19,14 @@ Ext.define('CustomApp', {
             listeners: {
                 scope: this,
                 change: function(rb, new_value, old_value) {
+                    this._asynch_return_flags = {};
                     this._getSprints();
+                    this._getInitialData();
                 },
                 ready: function(rb) {
+                    this._asynch_return_flags = {};
                     this._getSprints();
+                    this._getInitialData();
                 }
             }
         });
@@ -70,6 +74,56 @@ Ext.define('CustomApp', {
         this.logger.log(this,"iterations that match",iteration_query.toString());
         return iteration_query;
     },
+    _getInitialData: function() {
+        this.logger.log(this,"_getInitialData");
+        this.initial_estimate = 0;
+        
+        var release = this.down('#releasebox').getRecord() ;
+
+        var start_date_iso = Rally.util.DateTime.toIsoString(release.get('ReleaseStartDate'), true);
+        
+        Ext.create('Rally.data.WsapiDataStore',{
+            model:'Release',
+            autoLoad: true,
+            limit:'Infinity',
+            fetch: ['ObjectID'],
+            filters: [{property:'Name',value:release.get('Name')}],
+            listeners: {
+                scope: this,
+                load: function(store,releases){
+                    var me = this;
+                    Ext.Array.each(releases,function(team_release){
+                        me._asynch_return_flags[team_release.get('ObjectID')] = true;
+                        me._getReleaseCumulativeFlow(team_release.get('ObjectID'), start_date_iso);
+                    });
+                }
+            }
+        });
+    },
+    _getReleaseCumulativeFlow: function(release_oid, iso_date) {
+        this.logger.log(this,"_getReleaseCumulativeFlow",release_oid,iso_date);
+        Ext.create('Rally.data.WsapiDataStore',{
+            model:'ReleaseCumulativeFlowData',
+            filters:[
+                {property:'ReleaseObjectID',value:release_oid},
+                {property:'CreationDate',value:iso_date},
+                {property:'CardEstimateTotal',operator:'>',value: 0}
+            ],
+            autoLoad: true,
+            listeners: {
+                scope: this,
+                load: function(store,cfd){
+                    var me = this;
+                    Ext.Array.each(cfd,function(card){
+                        me.logger.log(me,release_oid,card.get('CardEstimateTotal'));
+                        me.initial_estimate += parseFloat(card.get('CardEstimateTotal'),10);
+                    });
+                    delete this._asynch_return_flags[release_oid];
+                    this._prepareChartData();
+                }
+            }
+        });
+    },
     _getSprints: function() {
         var me = this;
         me.logger.log(this,"_getSprints");
@@ -77,7 +131,7 @@ Ext.define('CustomApp', {
         // anti_sprint holds data for release artifacts not in approved sprints
         this.anti_sprint = Ext.create('Sprint',{ "Name": "Other" });
         
-        this._asynch_return_flags = {};
+        this._asynch_return_flags['current'] = true;
         
         // clear display
         this.down('#chart_box').removeAll();
@@ -215,7 +269,7 @@ Ext.define('CustomApp', {
                                     }
                                     sprint.add('total_accepted_defect_estimate',defect.get('PlanEstimate'));
                                 });
-                                
+                                delete this._asynch_return_flags['current'];
                                 me._prepareChartData();
                             }
                         }
@@ -233,11 +287,12 @@ Ext.define('CustomApp', {
         var chart_data = {
             categories: [""],
             total_by_sprint: [0],
-            ideal_by_sprint: []
+            ideal_by_sprint: [],
+            ideal_by_sprint_by_initial: []
         };
         if (this._allAsynchronousCallsReturned()){
             var me = this;
-            this.logger.log(this,"sprint_hash",me.sprint_hash);
+            this.logger.log(this,"sprint_hash",me.sprint_hash, me.initial_estimate);
             var totals = {
                 total_accepted_story_estimate:me.anti_sprint.get('total_accepted_story_estimate'),
                 total_accepted_defect_estimate:me.anti_sprint.get('total_accepted_defect_estimate'),
@@ -262,7 +317,7 @@ Ext.define('CustomApp', {
             
             this.down('#summary').update(totals);
             
-            // make a guess line
+            // make ideal line for current scope
             if ( totals.total_estimate > 0 && chart_data.total_by_sprint.length > 1 ) {
                 var ideal_per_sprint = totals.total_estimate / ( chart_data.total_by_sprint.length - 1 );
                 var running_ideal = 0;
@@ -271,6 +326,17 @@ Ext.define('CustomApp', {
                     running_ideal += ideal_per_sprint;
                 });
             }
+            // make ideal line for initial scope
+            var running_ideal = 0;
+            var ideal_by_sprint_by_initial = 0;
+            if ( this.initial_estimate > 0 && chart_data.total_by_sprint.length > 1 ) {
+                ideal_by_sprint_by_initial = this.initial_estimate / ( chart_data.total_by_sprint.length - 1 );
+            }
+            Ext.Array.each(chart_data.total_by_sprint,function(counter){
+                chart_data.ideal_by_sprint_by_initial.push(running_ideal);
+                running_ideal += ideal_by_sprint_by_initial;
+            });
+                
             this._makeChart(chart_data);
         }
     },
@@ -293,6 +359,12 @@ Ext.define('CustomApp', {
                     visible: true,
                     name: 'Total Planned US/DE Pts'
                 
+                },
+                {
+                    type:'line',
+                    data:chart_data.ideal_by_sprint_by_initial,
+                    visible: true,
+                    name: 'Initial Planned US/DE Pts'
                 }]
             },
             height: 600,
