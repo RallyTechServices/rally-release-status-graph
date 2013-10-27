@@ -343,29 +343,34 @@ Ext.define('CustomApp', {
     _makeChart: function(chart_data){
         this.logger.log(this,"_makeChart",chart_data);
         this.down('#chart_box').removeAll();
+        
+        var series = [{
+            type:'line',
+            data:chart_data.total_by_sprint,
+            visible: true,
+            name: 'Accepted US/DE Pts'
+        },
+        {
+            type:'line',
+            data:chart_data.ideal_by_sprint,
+            visible: true,
+            name: 'Total Planned US/DE Pts'
+        
+        }];
+        if ( SHOW_INITIAL ) {
+            series.push({
+                type:'line',
+                data:chart_data.ideal_by_sprint_by_initial,
+                visible: true,
+                name: 'Initial Planned US/DE Pts'
+            });
+        }
+        
         this.down('#chart_box').add({
             xtype:'rallychart',
             chartData: {
                 categories: chart_data.categories,
-                series: [{
-                    type:'line',
-                    data:chart_data.total_by_sprint,
-                    visible: true,
-                    name: 'Accepted US/DE Pts'
-                },
-                {
-                    type:'line',
-                    data:chart_data.ideal_by_sprint,
-                    visible: true,
-                    name: 'Total Planned US/DE Pts'
-                
-                },
-                {
-                    type:'line',
-                    data:chart_data.ideal_by_sprint_by_initial,
-                    visible: true,
-                    name: 'Initial Planned US/DE Pts'
-                }]
+                series: series
             },
             chartConfig: {
                 chart: {

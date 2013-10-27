@@ -46,6 +46,12 @@ module.exports = function(grunt) {
                         dest: 'deploy/App.html',
                         engine: 'underscore',
                         variables: config
+                },
+                prod_no_init: {
+                        src: 'templates/App-tpl-no-initial.html',
+                        dest: 'deploy/App_no_initial.html',
+                        engine: 'underscore',
+                        variables: config
                 }
         },
         jasmine: {
@@ -100,6 +106,28 @@ module.exports = function(grunt) {
         grunt.file.write(deploy_file,output);
         
     });
+    
+    grunt.registerTask('setChecksum_no_init', 'Make a sloppy checksum for the no initial line version', function() {
+        var fs = require('fs');
+        var chk = 0x12345678,
+            i;
+        var deploy_file = 'deploy/App_no_initial.html';
+
+        var file = grunt.file.read(deploy_file);
+        string = file.replace(/var CHECKSUM = .*;/,"");
+        
+        for (i = 0; i < string.length; i++) {
+            chk += (string.charCodeAt(i) * i);
+        }
+        grunt.log.writeln('sloppy checksum: ' + chk);
+        grunt.log.writeln('length: ' + string.length);
+// 
+        grunt.template.addDelimiters('square-brackets','[%','%]');
+        
+        var output = grunt.template.process(file, { data: { checksum: chk },  delimiters: 'square-brackets' });
+        grunt.file.write(deploy_file,output);
+        
+    });
 
     //load
     grunt.loadNpmTasks('grunt-templater');
@@ -109,7 +137,8 @@ module.exports = function(grunt) {
     grunt.registerTask('default', ['debug','build']);
     
     // (uses all the files in src/javascript)
-    grunt.registerTask('build', "Create the html for deployment",['template:prod','setChecksum']);
+    grunt.registerTask('build_no_init', "Create the one-off html file without initial line", ['template:prod_no_init', 'setChecksum_no_init']);
+    grunt.registerTask('build', "Create all the html for deployment",['template:prod','setChecksum', 'build_no_init' ]);
     // 
     grunt.registerTask('debug', "Create an html file that can run in its own tab", ['template:dev']);
    
