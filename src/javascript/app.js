@@ -234,7 +234,7 @@ Ext.define('CustomApp', {
             {property:'ScheduleState',operator:'>',value:'Completed'},
             {property:'Release.Name',value:release.get('Name')}
         ];
-        var fetch = ['PlanEstimate','ScheduleState','Iteration','Name'];
+        var fetch = ['PlanEstimate','ScheduleState','Iteration','Name','StartDate','EndDate'];
         
         Ext.create('Rally.data.WsapiDataStore',{
             autoLoad: true,
@@ -283,12 +283,31 @@ Ext.define('CustomApp', {
         this.logger.log(this,"Still waiting for:", this._asynch_return_flags);
         return ( Ext.Object.getKeys(this._asynch_return_flags).length == 0 );
     },
+    _setCurrentSprintIndex: function(data){
+        this.logger.log(this,"_setCurrentSprintIndex");
+        var me = this;
+        
+        var counter = 0;
+        
+        Ext.Object.each(this.sprint_hash, function(name,sprint){
+            var today = new Date();
+            
+            if ( today > sprint.get('start_date') && today < sprint.get('end_date') ) {
+                me.logger.log(me, "Found current sprint at index:",counter);
+                data.current_sprint_index = counter;
+            }
+            counter += 1;
+        });
+        
+        return data;
+    },
     _prepareChartData: function() {
         var chart_data = {
             categories: [""],
             total_by_sprint: [0],
             ideal_by_sprint: [],
-            ideal_by_sprint_by_initial: []
+            ideal_by_sprint_by_initial: [],
+            current_sprint_index: -1
         };
         if (this._allAsynchronousCallsReturned()){
             var me = this;
@@ -336,7 +355,10 @@ Ext.define('CustomApp', {
                 chart_data.ideal_by_sprint_by_initial.push(running_ideal);
                 running_ideal += ideal_by_sprint_by_initial;
             });
-                
+            
+            
+            this._setCurrentSprintIndex(chart_data);
+            
             this._makeChart(chart_data);
         }
     },
@@ -363,6 +385,22 @@ Ext.define('CustomApp', {
                 data:chart_data.ideal_by_sprint_by_initial,
                 visible: true,
                 name: 'Initial Planned US/DE Pts'
+            });
+        }
+        
+        var plot_lines = [];
+        
+        if ( chart_data.current_sprint_index > -1 ) {
+            plot_lines.push({
+                color: '#0a0',
+                width: 2,
+                value: chart_data.current_sprint_index,
+                label: {
+                    text: 'Current Sprint',
+                    style: {
+                        color: '#0a0'
+                    }
+                }
             });
         }
         
@@ -399,7 +437,8 @@ Ext.define('CustomApp', {
                     labels: {
                         rotation: 90,
                         align: 'left'
-                    }
+                    },
+                    plotLines: plot_lines
                 }]
             }
         });
