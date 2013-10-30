@@ -394,7 +394,7 @@ Ext.define('CustomApp', {
             plot_lines.push({
                 color: '#0a0',
                 width: 2,
-                value: chart_data.current_sprint_index,
+                value: chart_data.current_sprint_index + 1,
                 label: {
                     text: 'Current Sprint',
                     style: {
