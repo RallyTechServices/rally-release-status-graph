@@ -304,6 +304,7 @@ Ext.define('CustomApp', {
     _prepareChartData: function() {
         var chart_data = {
             categories: [""],
+            accepted_by_sprint: [null],
             total_by_sprint: [0],
             ideal_by_sprint: [],
             ideal_by_sprint_by_initial: [],
@@ -323,9 +324,12 @@ Ext.define('CustomApp', {
             
             Ext.Object.each(this.sprint_hash, function(name,sprint){
                 me.logger.log(me,"sprint",name);
-                chart_data.categories.push(sprint.get('Name'));
-                accepted_running_total += sprint.get('total_accepted_story_estimate');
-                accepted_running_total += sprint.get('total_accepted_defect_estimate');
+                chart_data.categories.push(name);
+                var sprint_total = sprint.get('total_accepted_story_estimate');
+                sprint_total += sprint.get('total_accepted_defect_estimate');
+                chart_data.accepted_by_sprint.push(sprint_total);
+                
+                accepted_running_total += sprint_total;
                 chart_data.total_by_sprint.push(accepted_running_total);
                 
                 Ext.Object.each(totals, function(key,value){
@@ -366,11 +370,18 @@ Ext.define('CustomApp', {
         this.logger.log(this,"_makeChart",chart_data);
         this.down('#chart_box').removeAll();
         
-        var series = [{
+        var series = [
+        { 
+            type: 'column',
+            data:chart_data.accepted_by_sprint,
+            visible: true,
+            name: 'Accepted US/DE Pts'
+        },
+        {
             type:'line',
             data:chart_data.total_by_sprint,
             visible: true,
-            name: 'Accepted US/DE Pts'
+            name: 'Total Accepted US/DE Pts'
         },
         {
             type:'line',
@@ -443,7 +454,12 @@ Ext.define('CustomApp', {
                         align: 'left'
                     },
                     plotLines: plot_lines
-                }]
+                }],
+                plotOptions: {
+                    column: {
+                        pointWidth: 20
+                    }
+                }
             }
         });
     }
