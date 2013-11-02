@@ -394,7 +394,7 @@ Ext.define('CustomApp', {
             plot_lines.push({
                 color: '#0a0',
                 width: 2,
-                value: chart_data.current_sprint_index + 1,
+                value: chart_data.current_sprint_index ,
                 label: {
                     text: 'Current Sprint',
                     style: {
@@ -426,6 +426,10 @@ Ext.define('CustomApp', {
                     },
                     min: 0
                 }],
+                tooltip: {
+                    shared: true,
+                    valueSuffix: ' pts'
+                },
                 xAxis: [{
                     title: {
                         enabled: true,

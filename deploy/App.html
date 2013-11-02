@@ -3,11 +3,11 @@
 <head>
     <title>Release Status Graph</title>
     <!--  (c) 2013 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Wed Oct 30 2013 11:21:27 GMT-0700 (PDT) -->
+    <!--  Build Date: Fri Nov 01 2013 18:04:15 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Oct 30 2013 11:21:27 GMT-0700 (PDT)";
-        var CHECKSUM = 23542741379;
+        var APP_BUILD_DATE = "Fri Nov 01 2013 18:04:15 GMT-0700 (PDT)";
+        var CHECKSUM = 23708153147;
         var SHOW_INITIAL = true;
     </script>
     
@@ -635,7 +635,7 @@ Ext.define('CustomApp', {
             plot_lines.push({
                 color: '#0a0',
                 width: 2,
-                value: chart_data.current_sprint_index + 1,
+                value: chart_data.current_sprint_index ,
                 label: {
                     text: 'Current Sprint',
                     style: {
@@ -667,6 +667,10 @@ Ext.define('CustomApp', {
                     },
                     min: 0
                 }],
+                tooltip: {
+                    shared: true,
+                    valueSuffix: ' pts'
+                },
                 xAxis: [{
                     title: {
                         enabled: true,
