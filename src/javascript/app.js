@@ -396,7 +396,7 @@ Ext.define('CustomApp', {
                 width: 2,
                 value: chart_data.current_sprint_index ,
                 label: {
-                    text: 'Current Sprint',
+                    text: 'Last Complete Sprint',
                     style: {
                         color: '#0a0'
                     }
