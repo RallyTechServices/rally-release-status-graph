@@ -1,0 +1,10 @@
+*.iml
+*.ipr
+*.iws
+.idea
+.grunt
+_SpecRunner.html
+node_modules
+*.sublime-workspace
+.DS_Store
+*.log
