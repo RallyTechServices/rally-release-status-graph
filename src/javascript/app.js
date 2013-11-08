@@ -47,21 +47,6 @@ Ext.define('CustomApp', {
         var release = this.down('#releasebox').getRecord();
         var start_date_iso = Rally.util.DateTime.toIsoString(release.get('ReleaseStartDate'), true);
         var end_date_iso = Rally.util.DateTime.toIsoString(release.get('ReleaseDate'), true);
-//
-        // All sprints that touch the release dates
-//        var start_query = Ext.create('Rally.data.QueryFilter',{ 
-//                property: "StartDate", operator:">=", value: start_date_iso
-//            }).and( Ext.create('Rally.data.QueryFilter',{
-//                property: "StartDate", operator:"<=", value: end_date_iso
-//            })
-//        );
-//        var end_query = Ext.create('Rally.data.QueryFilter',{ 
-//                property: "EndDate", operator:">=", value: start_date_iso 
-//            }).and( Ext.create('Rally.data.QueryFilter',{
-//                property: "EndDate", operator:"<=", value: end_date_iso
-//            })
-//        );
-//        var iteration_query = start_query.or(end_query);
 
         // All sprints inside the release dates:
         var iteration_query = Ext.create('Rally.data.QueryFilter',{ 
@@ -301,6 +286,31 @@ Ext.define('CustomApp', {
         
         return data;
     },
+    // returns -1 if there aren't any non-zero sprints
+    _getMeanVelocity: function(data){
+        var average = -1;
+        
+        var sprint_index = data.current_sprint_index;
+        
+        if (sprint_index > -1) {
+            var all_velocities = Ext.Array.slice(data.accepted_by_sprint,1,sprint_index+1);
+            this.logger.log(this,"All velocities",all_velocities);
+            // remove zeroes
+            var nonzero_velocities = [];
+            Ext.Array.each(all_velocities,function(velocity){
+                if (velocity > 0) { nonzero_velocities.push(velocity); }
+            });
+            
+            var last_three_nonzero_velocities = Ext.Array.slice(nonzero_velocities,-3);
+            this.logger.log(this,"Last three nonzero velocities",last_three_nonzero_velocities);
+            
+            if ( last_three_nonzero_velocities.length > 0 ) {
+                average = Ext.Array.mean(last_three_nonzero_velocities);
+            }
+        }
+        
+        return average;
+    },
     _prepareChartData: function() {
         var chart_data = {
             categories: [""],
@@ -308,6 +318,7 @@ Ext.define('CustomApp', {
             total_by_sprint: [0],
             ideal_by_sprint: [],
             ideal_by_sprint_by_initial: [],
+            projected_by_sprint: [null],
             current_sprint_index: -1
         };
         if (this._allAsynchronousCallsReturned()){
@@ -331,7 +342,9 @@ Ext.define('CustomApp', {
                 
                 accepted_running_total += sprint_total;
                 chart_data.total_by_sprint.push(accepted_running_total);
+                chart_data.projected_by_sprint.push(null);
                 
+                // update summary data
                 Ext.Object.each(totals, function(key,value){
                     totals[key] += sprint.get(key);
                 });
@@ -339,6 +352,25 @@ Ext.define('CustomApp', {
             });
             
             this.down('#summary').update(totals);
+            this._setCurrentSprintIndex(chart_data);
+            // null out accepted for future sprints
+            if ( chart_data.current_sprint_index > -1 ) {
+                var sprint_index = chart_data.current_sprint_index;
+                for ( var i=sprint_index+1;i<chart_data.total_by_sprint.length; i++ ) {
+                    chart_data.total_by_sprint[i] = null;
+                }
+                var mean_velocity = this._getMeanVelocity(chart_data);
+                if ( mean_velocity > 0 ) {
+                    this.logger.log(this,"mean",mean_velocity);
+                    var projected = chart_data.total_by_sprint[sprint_index];
+                    for ( var i=sprint_index;i<chart_data.total_by_sprint.length;i++ ) {
+                        chart_data.projected_by_sprint[i] = projected;
+                        projected += mean_velocity;
+                    }
+                    this.logger.log(this,"projected",chart_data.projected_by_sprint);
+                }
+            }
+            
             
             // make ideal line for current scope
             if ( totals.total_estimate > 0 && chart_data.total_by_sprint.length > 1 ) {
@@ -359,9 +391,6 @@ Ext.define('CustomApp', {
                 chart_data.ideal_by_sprint_by_initial.push(running_ideal);
                 running_ideal += ideal_by_sprint_by_initial;
             });
-            
-            
-            this._setCurrentSprintIndex(chart_data);
             
             this._makeChart(chart_data);
         }
@@ -396,6 +425,15 @@ Ext.define('CustomApp', {
                 data:chart_data.ideal_by_sprint_by_initial,
                 visible: true,
                 name: 'Initial Planned US/DE Pts'
+            });
+        }
+        
+        if ( chart_data.current_sprint_index > -1 ) {
+            series.push({
+                type:'line',
+                data:chart_data.projected_by_sprint,
+                visible: true,
+                name: 'Projected US/DE Pts'
             });
         }
         
